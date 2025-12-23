@@ -210,12 +210,14 @@ type Message struct {
 	ErrorMessage      string     `gorm:"type:text" json:"error_message"`
 	IsReply           bool       `gorm:"default:false" json:"is_reply"`
 	ReplyToMessageID  *uuid.UUID `gorm:"type:uuid" json:"reply_to_message_id,omitempty"`
+	SentByUserID      *uuid.UUID `gorm:"type:uuid;index" json:"sent_by_user_id,omitempty"` // User who sent outgoing message
 	Metadata          JSONB      `gorm:"type:jsonb;default:'{}'" json:"metadata"`
 
 	// Relations
 	Organization   *Organization `gorm:"foreignKey:OrganizationID" json:"organization,omitempty"`
 	Contact        *Contact      `gorm:"foreignKey:ContactID" json:"contact,omitempty"`
 	ReplyToMessage *Message      `gorm:"foreignKey:ReplyToMessageID" json:"reply_to_message,omitempty"`
+	SentByUser     *User         `gorm:"foreignKey:SentByUserID" json:"sent_by_user,omitempty"`
 }
 
 func (Message) TableName() string {

@@ -362,6 +362,7 @@ func (a *App) SendMessage(r *fastglue.Request) error {
 		MessageType:     req.Type,
 		Content:         req.Content.Body,
 		Status:          "pending",
+		SentByUserID:    &userID,
 	}
 
 	if err := a.DB.Create(&message).Error; err != nil {
@@ -621,6 +622,7 @@ func (a *App) SendMediaMessage(r *fastglue.Request) error {
 		MediaMimeType:   mimeType,
 		MediaFilename:   fileHeader.Filename,
 		Status:          "pending",
+		SentByUserID:    &userID,
 	}
 
 	if err := a.DB.Create(&message).Error; err != nil {
