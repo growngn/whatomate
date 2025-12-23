@@ -34,15 +34,6 @@ secret = "your-super-secret-jwt-key-change-in-production"
 access_expiry_mins = 15
 refresh_expiry_days = 7
 
-[whatsapp]
-webhook_verify_token = "your-webhook-verify-token"
-api_version = "v18.0"
-
-[ai]
-openai_key = ""
-anthropic_key = ""
-google_key = ""
-
 [storage]
 type = "local"  # local, s3
 local_path = "./uploads"
