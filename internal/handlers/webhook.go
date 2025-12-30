@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/shridarpatil/whatomate/internal/models"
@@ -50,6 +51,15 @@ type WebhookStatusError struct {
 	Message string `json:"message"`
 }
 
+// TemplateStatusUpdate represents a template status update from Meta webhook
+type TemplateStatusUpdate struct {
+	Event                   string `json:"event"`
+	MessageTemplateID       int64  `json:"message_template_id"`
+	MessageTemplateName     string `json:"message_template_name"`
+	MessageTemplateLanguage string `json:"message_template_language"`
+	Reason                  string `json:"reason,omitempty"`
+}
+
 // WebhookStatus represents a message status update from Meta
 type WebhookStatus struct {
 	ID           string `json:"id"`
@@ -79,7 +89,13 @@ type WebhookPayload struct {
 					DisplayPhoneNumber string `json:"display_phone_number"`
 					PhoneNumberID      string `json:"phone_number_id"`
 				} `json:"metadata"`
-				Contacts []struct {
+				// Template status update fields (when field == "message_template_status_update")
+				Event                   string `json:"event,omitempty"`
+				MessageTemplateID       int64  `json:"message_template_id,omitempty"`
+				MessageTemplateName     string `json:"message_template_name,omitempty"`
+				MessageTemplateLanguage string `json:"message_template_language,omitempty"`
+				Reason                  string `json:"reason,omitempty"`
+				Contacts                []struct {
 					Profile struct {
 						Name string `json:"name"`
 					} `json:"profile"`
@@ -166,6 +182,18 @@ func (a *App) WebhookHandler(r *fastglue.Request) error {
 	// Process each entry
 	for _, entry := range payload.Entry {
 		for _, change := range entry.Changes {
+			// Handle template status updates
+			if change.Field == "message_template_status_update" {
+				a.Log.Info("Received template status update",
+					"event", change.Value.Event,
+					"template_name", change.Value.MessageTemplateName,
+					"template_language", change.Value.MessageTemplateLanguage,
+					"waba_id", entry.ID,
+				)
+				go a.processTemplateStatusUpdate(entry.ID, change.Value.Event, change.Value.MessageTemplateName, change.Value.MessageTemplateLanguage, change.Value.Reason)
+				continue
+			}
+
 			if change.Field != "messages" {
 				continue
 			}
@@ -353,5 +381,57 @@ func (a *App) updateMessageStatus(whatsappMsgID, statusValue string, errors []We
 				"status":     statusValue,
 			},
 		})
+	}
+}
+
+// processTemplateStatusUpdate updates template status when Meta sends a status update webhook
+func (a *App) processTemplateStatusUpdate(wabaID, event, templateName, templateLanguage, reason string) {
+	if templateName == "" {
+		a.Log.Warn("Template status update missing template name")
+		return
+	}
+
+	// Map Meta's event names to lowercase status values
+	// Events: APPROVED, REJECTED, PENDING, DISABLED, PENDING_DELETION, DELETED, REINSTATED, FLAGGED
+	status := strings.ToLower(event)
+
+	// Find WhatsApp accounts that use this WABA ID
+	var accounts []models.WhatsAppAccount
+	if err := a.DB.Where("whatsapp_business_account_id = ?", wabaID).Find(&accounts).Error; err != nil {
+		a.Log.Error("Failed to find WhatsApp accounts for WABA", "error", err, "waba_id", wabaID)
+		return
+	}
+
+	if len(accounts) == 0 {
+		a.Log.Warn("No WhatsApp accounts found for WABA", "waba_id", wabaID)
+		return
+	}
+
+	// Update template for each account that has it
+	for _, account := range accounts {
+		// Find and update the template
+		result := a.DB.Model(&models.Template{}).
+			Where("whats_app_account = ? AND name = ? AND language = ?", account.Name, templateName, templateLanguage).
+			Update("status", status)
+
+		if result.Error != nil {
+			a.Log.Error("Failed to update template status",
+				"error", result.Error,
+				"account", account.Name,
+				"template", templateName,
+				"language", templateLanguage,
+			)
+			continue
+		}
+
+		if result.RowsAffected > 0 {
+			a.Log.Info("Updated template status from webhook",
+				"account", account.Name,
+				"template", templateName,
+				"language", templateLanguage,
+				"status", status,
+				"reason", reason,
+			)
+		}
 	}
 }
