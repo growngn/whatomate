@@ -2,8 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useTransfersStore } from '@/stores/transfers'
-import { usersService } from '@/services/api'
+import { usersService, chatbotService } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
@@ -56,22 +55,36 @@ import { getInitials } from '@/lib/utils'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const transfersStore = useTransfersStore()
 const isCollapsed = ref(false)
 const isUserMenuOpen = ref(false)
 const isUpdatingAvailability = ref(false)
+const isCheckingTransfers = ref(false)
 const showAwayWarning = ref(false)
 const awayWarningTransferCount = ref(0)
 const { colorMode, isDark, setColorMode } = useColorMode()
 
 const handleAvailabilityChange = async (checked: boolean) => {
-  // If going away and has assigned transfers, show warning
+  // If going away, check for assigned transfers first
   if (!checked) {
-    const myActiveTransfers = transfersStore.myTransfers.length
-    if (myActiveTransfers > 0) {
-      awayWarningTransferCount.value = myActiveTransfers
-      showAwayWarning.value = true
-      return
+    isCheckingTransfers.value = true
+    try {
+      // Fetch current user's active transfers from API
+      const response = await chatbotService.listTransfers({ status: 'active' })
+      const data = response.data.data || response.data
+      const transfers = data.transfers || []
+      const userId = authStore.user?.id
+      const myActiveTransfers = transfers.filter((t: any) => t.agent_id === userId)
+
+      if (myActiveTransfers.length > 0) {
+        awayWarningTransferCount.value = myActiveTransfers.length
+        showAwayWarning.value = true
+        return
+      }
+    } catch (error) {
+      console.error('Failed to check transfers:', error)
+      // Proceed anyway if check fails
+    } finally {
+      isCheckingTransfers.value = false
     }
   }
 
@@ -380,7 +393,7 @@ const handleLogout = async () => {
               </div>
               <Switch
                 :checked="authStore.isAvailable"
-                :disabled="isUpdatingAvailability"
+                :disabled="isUpdatingAvailability || isCheckingTransfers"
                 @update:checked="handleAvailabilityChange"
               />
             </div>
