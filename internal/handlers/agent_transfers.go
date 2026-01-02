@@ -24,7 +24,8 @@ type CreateAgentTransferRequest struct {
 
 // AssignTransferRequest represents the request to assign a transfer to an agent
 type AssignTransferRequest struct {
-	AgentID *string `json:"agent_id"`
+	AgentID *string `json:"agent_id"` // null or empty string = unassign, UUID = assign to agent
+	TeamID  *string `json:"team_id"`  // optional: move to different team queue
 }
 
 // AgentTransferResponse represents an agent transfer in API responses
@@ -639,6 +640,30 @@ func (a *App) AssignAgentTransfer(r *fastglue.Request) error {
 		targetAgentID = &userID
 	}
 
+	// Handle team reassignment (admin/manager only)
+	if req.TeamID != nil {
+		if role == "agent" {
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, "Agents cannot change team assignment", nil, "")
+		}
+
+		if *req.TeamID == "" {
+			// Move to general queue
+			transfer.TeamID = nil
+		} else {
+			// Move to specific team
+			parsedTeamID, err := uuid.Parse(*req.TeamID)
+			if err != nil {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid team_id", nil, "")
+			}
+			// Verify team exists
+			var team models.Team
+			if err := a.DB.Where("id = ? AND organization_id = ?", parsedTeamID, orgID).First(&team).Error; err != nil {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Team not found", nil, "")
+			}
+			transfer.TeamID = &parsedTeamID
+		}
+	}
+
 	// Update transfer
 	transfer.AgentID = targetAgentID
 
@@ -654,6 +679,9 @@ func (a *App) AssignAgentTransfer(r *fastglue.Request) error {
 	// Update contact assignment
 	if targetAgentID != nil && transfer.Contact != nil {
 		a.DB.Model(transfer.Contact).Update("assigned_user_id", targetAgentID)
+	} else if targetAgentID == nil && transfer.Contact != nil {
+		// Clear assignment when unassigning
+		a.DB.Model(transfer.Contact).Update("assigned_user_id", nil)
 	}
 
 	// Broadcast WebSocket notification
@@ -1313,4 +1341,46 @@ func (a *App) createTransferToTeam(account *models.WhatsAppAccount, contact *mod
 
 	// Broadcast to WebSocket
 	a.broadcastTransferCreated(&transfer, contact)
+}
+
+
+// ReturnAgentTransfersToQueue returns all active transfers assigned to an agent back to their team queues
+// Called when an agent goes offline/unavailable
+func (a *App) ReturnAgentTransfersToQueue(userID, orgID uuid.UUID) int {
+	var transfers []models.AgentTransfer
+	if err := a.DB.Where("agent_id = ? AND organization_id = ? AND status = ?", userID, orgID, "active").
+		Preload("Contact").Find(&transfers).Error; err != nil {
+		a.Log.Error("Failed to find agent transfers for queue return", "error", err, "user_id", userID)
+		return 0
+	}
+
+	if len(transfers) == 0 {
+		return 0
+	}
+
+	// Return each transfer to its team queue (or general queue)
+	for i := range transfers {
+		transfer := &transfers[i]
+		transfer.AgentID = nil
+
+		if err := a.DB.Save(transfer).Error; err != nil {
+			a.Log.Error("Failed to return transfer to queue", "error", err, "transfer_id", transfer.ID)
+			continue
+		}
+
+		// Clear contact assignment
+		if transfer.ContactID != uuid.Nil {
+			a.DB.Model(&models.Contact{}).Where("id = ?", transfer.ContactID).Update("assigned_user_id", nil)
+		}
+
+		// Broadcast the unassignment
+		a.broadcastTransferAssigned(transfer)
+	}
+
+	a.Log.Info("Returned agent transfers to queue",
+		"user_id", userID,
+		"count", len(transfers),
+	)
+
+	return len(transfers)
 }
