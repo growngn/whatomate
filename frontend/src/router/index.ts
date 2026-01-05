@@ -90,9 +90,7 @@ const router = createRouter({
         },
         {
           path: 'chatbot/settings',
-          name: 'chatbot-settings',
-          component: () => import('@/views/chatbot/ChatbotSettingsView.vue'),
-          meta: { roles: ['admin', 'manager'] }
+          redirect: '/settings'
         },
         {
           path: 'chatbot/keywords',
