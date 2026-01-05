@@ -1992,18 +1992,25 @@ func (a *App) handleIncomingReaction(account *models.WhatsAppAccount, fromPhone,
 	// Find the message being reacted to
 	// WhatsApp encodes phone numbers in the WAMID prefix, so the same message
 	// has different WAMIDs from sender vs recipient perspective.
-	// We match on the suffix (after "FQIAEhgU") which is the unique message ID.
+	// We match on the suffix after "FQIA" + 4 chars (type indicator like "ERgS" or "EhgU")
 	var message models.Message
 	if err := a.DB.Where("whats_app_message_id = ?", messageWAMID).First(&message).Error; err != nil {
 		// Try matching on WAMID suffix (the unique message ID part)
-		if idx := strings.Index(messageWAMID, "FQIAEhgU"); idx != -1 {
-			suffix := messageWAMID[idx:]
-			if err := a.DB.Where("whats_app_message_id LIKE ?", "%"+suffix).First(&message).Error; err != nil {
-				a.Log.Warn("Message not found for reaction", "wamid", messageWAMID, "suffix", suffix)
+		if idx := strings.Index(messageWAMID, "FQIA"); idx != -1 {
+			// Extract suffix after "FQIA" + 4 char type indicator (e.g., "ERgS", "EhgU")
+			suffixStart := idx + 8
+			if suffixStart < len(messageWAMID) {
+				suffix := messageWAMID[suffixStart:]
+				if err := a.DB.Where("whats_app_message_id LIKE ?", "%"+suffix).First(&message).Error; err != nil {
+					a.Log.Warn("Message not found for reaction", "wamid", messageWAMID, "suffix", suffix)
+					return
+				}
+			} else {
+				a.Log.Warn("Message not found for reaction - invalid WAMID format", "wamid", messageWAMID)
 				return
 			}
 		} else {
-			a.Log.Warn("Message not found for reaction", "wamid", messageWAMID)
+			a.Log.Warn("Message not found for reaction - no FQIA pattern", "wamid", messageWAMID)
 			return
 		}
 	}
