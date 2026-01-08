@@ -5,13 +5,33 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
-//go:embed dist/*
+// mimeTypes maps file extensions to MIME types
+var mimeTypes = map[string]string{
+	".js":    "application/javascript",
+	".mjs":   "application/javascript",
+	".css":   "text/css",
+	".html":  "text/html",
+	".json":  "application/json",
+	".png":   "image/png",
+	".jpg":   "image/jpeg",
+	".jpeg":  "image/jpeg",
+	".gif":   "image/gif",
+	".svg":   "image/svg+xml",
+	".ico":   "image/x-icon",
+	".woff":  "font/woff",
+	".woff2": "font/woff2",
+	".ttf":   "font/ttf",
+	".eot":   "application/vnd.ms-fontobject",
+}
+
+//go:embed all:dist
 var distFS embed.FS
 
 // cachedIndexHTML stores the modified index.html with injected base path
@@ -51,16 +71,48 @@ func Handler(basePath string) fasthttp.RequestHandler {
 	// Create file server
 	fileServer := http.FileServer(http.FS(distSubFS))
 
-	// Wrap with SPA fallback
+	// Wrap with SPA fallback and proper MIME types
 	spaHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
 		// Try to serve the file
 		if path != "/" && !strings.HasPrefix(path, "/api") {
 			// Check if file exists
-			if f, err := distSubFS.Open(strings.TrimPrefix(path, "/")); err == nil {
-				f.Close()
-				fileServer.ServeHTTP(w, r)
+			filePath := strings.TrimPrefix(path, "/")
+			file, err := distSubFS.Open(filePath)
+			if err == nil {
+				defer file.Close()
+
+				// Get file info for size
+				stat, err := file.Stat()
+				if err != nil {
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+
+				// Skip directories
+				if stat.IsDir() {
+					fileServer.ServeHTTP(w, r)
+					return
+				}
+
+				// Set correct Content-Type based on file extension
+				ext := strings.ToLower(filepath.Ext(filePath))
+				if mimeType, ok := mimeTypes[ext]; ok {
+					w.Header().Set("Content-Type", mimeType)
+				} else {
+					w.Header().Set("Content-Type", "application/octet-stream")
+				}
+
+				// Read and serve file content
+				content, err := fs.ReadFile(distSubFS, filePath)
+				if err != nil {
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+				w.Write(content)
 				return
 			}
 		}
