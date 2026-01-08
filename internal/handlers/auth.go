@@ -138,7 +138,7 @@ func (a *App) Register(r *fastglue.Request) error {
 		Email:          req.Email,
 		PasswordHash:   string(hashedPassword),
 		FullName:       req.FullName,
-		Role:           "admin", // First user is admin
+		Role:           "agent", // Default role is agent
 		IsActive:       true,
 	}
 
