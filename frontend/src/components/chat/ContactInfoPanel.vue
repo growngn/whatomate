@@ -222,17 +222,17 @@ const contactTags = computed(() => {
               <CollapsibleContent>
                 <div
                   :class="[
-                    'grid gap-3 pt-2',
+                    'grid gap-2 pt-2',
                     section.columns === 2 ? 'grid-cols-2' : 'grid-cols-1'
                   ]"
                 >
                   <div
                     v-for="field in section.fields.sort((a, b) => a.order - b.order)"
                     :key="field.key"
-                    class="space-y-1"
+                    class="bg-muted/50 rounded-md px-3 py-2"
                   >
-                    <p class="text-xs text-muted-foreground">{{ field.label }}</p>
-                    <p class="text-sm font-medium break-words">{{ getFieldValue(field.key) }}</p>
+                    <p class="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{{ field.label }}</p>
+                    <p class="text-sm font-semibold break-words mt-0.5">{{ getFieldValue(field.key) }}</p>
                   </div>
                 </div>
               </CollapsibleContent>
@@ -243,17 +243,17 @@ const contactTags = computed(() => {
               <h5 class="py-2 text-sm font-medium">{{ section.label }}</h5>
               <div
                 :class="[
-                  'grid gap-3',
+                  'grid gap-2',
                   section.columns === 2 ? 'grid-cols-2' : 'grid-cols-1'
                 ]"
               >
                 <div
                   v-for="field in section.fields.sort((a, b) => a.order - b.order)"
                   :key="field.key"
-                  class="space-y-1"
+                  class="bg-muted/50 rounded-md px-3 py-2"
                 >
-                  <p class="text-xs text-muted-foreground">{{ field.label }}</p>
-                  <p class="text-sm font-medium break-words">{{ getFieldValue(field.key) }}</p>
+                  <p class="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{{ field.label }}</p>
+                  <p class="text-sm font-semibold break-words mt-0.5">{{ getFieldValue(field.key) }}</p>
                 </div>
               </div>
             </div>
