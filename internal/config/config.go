@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml"
@@ -125,6 +127,42 @@ func Load(configPath string) (*Config, error) {
 	setDefaults(&cfg)
 
 	return &cfg, nil
+}
+
+// LoadEnvConfig loads configuration purely from environment variables (Railway deployment)
+func LoadEnvConfig() (*Config, error) {
+	cfg := &Config{}
+
+	// DB URL
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL not set")
+	}
+	cfg.Database.URL = dbURL
+
+	// Redis URL
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		return nil, fmt.Errorf("REDIS_URL not set")
+	}
+	cfg.Redis.URL = redisURL
+
+	// Server port
+	portStr := os.Getenv("PORT")
+	if portStr == "" {
+		portStr = "8080"
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid PORT value: %w", err)
+	}
+	cfg.Server.Host = "0.0.0.0"
+	cfg.Server.Port = port
+
+	// Set defaults for other required fields
+	setDefaults(cfg)
+
+	return cfg, nil
 }
 
 func setDefaults(cfg *Config) {

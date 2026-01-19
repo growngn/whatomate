@@ -60,4 +60,5 @@ BRAIN.md
 brain_meta.json
 project/structure.json
 changelog/BRAIN-changes.md
+docs/deploy.md
 .gitignore
