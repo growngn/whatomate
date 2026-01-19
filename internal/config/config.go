@@ -38,6 +38,7 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
+	URL             string `koanf:"url"`
 	Host            string `koanf:"host"`
 	Port            int    `koanf:"port"`
 	User            string `koanf:"user"`
@@ -50,6 +51,7 @@ type DatabaseConfig struct {
 }
 
 type RedisConfig struct {
+	URL      string `koanf:"url"`
 	Host     string `koanf:"host"`
 	Port     int    `koanf:"port"`
 	Password string `koanf:"password"`
@@ -109,6 +111,14 @@ func Load(configPath string) (*Config, error) {
 	var cfg Config
 	if err := k.Unmarshal("", &cfg); err != nil {
 		return nil, err
+	}
+
+	// Override with direct env vars (Railway style)
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		cfg.Database.URL = dbURL
+	}
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		cfg.Redis.URL = redisURL
 	}
 
 	// Set defaults

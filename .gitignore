@@ -57,3 +57,7 @@ uploads/
 # Test results
 test-results/
 BRAIN.md
+brain_meta.json
+project/structure.json
+changelog/BRAIN-changes.md
+.gitignore

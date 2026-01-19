@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/shridarpatil/whatomate/internal/config"
@@ -13,15 +12,15 @@ import (
 func NewRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	var client *redis.Client
 
-	// Check for REDIS_URL environment variable first (Railway)
-	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
-		opt, err := redis.ParseURL(redisURL)
+	// Use URL if provided (from REDIS_URL env var or config)
+	if cfg.URL != "" {
+		opt, err := redis.ParseURL(cfg.URL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse REDIS_URL: %w", err)
+			return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
 		}
 		client = redis.NewClient(opt)
 	} else {
-		// Fallback to config file values
+		// Fallback to individual config fields
 		client = redis.NewClient(&redis.Options{
 			Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			Password: cfg.Password,

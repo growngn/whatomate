@@ -18,11 +18,11 @@ import (
 func NewPostgres(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
 	var dsn string
 
-	// Check for DATABASE_URL environment variable first (Railway)
-	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
-		dsn = dbURL
+	// Use URL if provided (from DATABASE_URL env var or config)
+	if cfg.URL != "" {
+		dsn = cfg.URL
 	} else {
-		// Fallback to config file values
+		// Fallback to individual config fields
 		dsn = fmt.Sprintf(
 			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 			cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode,
