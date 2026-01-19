@@ -14,13 +14,20 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-
 // NewPostgres creates a new PostgreSQL connection
 func NewPostgres(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
-	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode,
-	)
+	var dsn string
+
+	// Check for DATABASE_URL environment variable first (Railway)
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		dsn = dbURL
+	} else {
+		// Fallback to config file values
+		dsn = fmt.Sprintf(
+			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+			cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode,
+		)
+	}
 
 	logLevel := logger.Silent
 	if debug {

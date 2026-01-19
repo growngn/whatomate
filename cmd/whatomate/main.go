@@ -188,8 +188,14 @@ func runServer(args []string) {
 		Name:         "Whatomate",
 	}
 
+	// Determine port from environment or config
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = fmt.Sprintf("%d", cfg.Server.Port)
+	}
+
 	// Start server in goroutine
-	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, port)
 	go func() {
 		lo.Info("Server listening", "address", addr)
 		if err := server.ListenAndServe(addr); err != nil {

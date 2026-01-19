@@ -1,12 +1,14 @@
 package config
 
 import (
+	"log"
+	"os"
 	"strings"
 
-	"github.com/knadh/koanf/v2"
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
 )
 
 // Config holds all configuration for the application
@@ -55,9 +57,9 @@ type RedisConfig struct {
 }
 
 type JWTConfig struct {
-	Secret           string `koanf:"secret"`
-	AccessExpiryMins int    `koanf:"access_expiry_mins"`
-	RefreshExpiryDays int   `koanf:"refresh_expiry_days"`
+	Secret            string `koanf:"secret"`
+	AccessExpiryMins  int    `koanf:"access_expiry_mins"`
+	RefreshExpiryDays int    `koanf:"refresh_expiry_days"`
 }
 
 type WhatsAppConfig struct {
@@ -85,10 +87,14 @@ type StorageConfig struct {
 func Load(configPath string) (*Config, error) {
 	k := koanf.New(".")
 
-	// Load from config file if provided
+	// Load from config file if provided and exists
 	if configPath != "" {
-		if err := k.Load(file.Provider(configPath), toml.Parser()); err != nil {
-			return nil, err
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			log.Println("config.toml not found, using environment variables only")
+		} else {
+			if err := k.Load(file.Provider(configPath), toml.Parser()); err != nil {
+				return nil, err
+			}
 		}
 	}
 
