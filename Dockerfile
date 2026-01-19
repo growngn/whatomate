@@ -1,8 +1,12 @@
 # Build stage with Go and Node.js
 FROM golang:1.24-bullseye AS builder
 
-# Install Node.js and npm
-RUN apt-get update && apt-get install -y nodejs npm
+# Install Node.js 20 (NOT Debian nodejs)
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+RUN node -v && npm -v
 
 WORKDIR /app
 
