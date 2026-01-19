@@ -159,6 +159,12 @@ func LoadEnvConfig() (*Config, error) {
 	cfg.Server.Host = "0.0.0.0"
 	cfg.Server.Port = port
 
+	// JWT secret
+	cfg.JWT.Secret = os.Getenv("JWT_SECRET")
+	if cfg.JWT.Secret == "" {
+		return nil, fmt.Errorf("JWT_SECRET not set")
+	}
+
 	// Set defaults for other required fields
 	setDefaults(cfg)
 

@@ -294,7 +294,13 @@ func runWorker(args []string) {
 	lo.Info("Starting Whatomate worker...", "version", Version)
 
 	// Load configuration
-	cfg, err := config.Load(*configPath)
+	var cfg *config.Config
+	var err error
+	if os.Getenv("RAILWAY_ENVIRONMENT") != "" || os.Getenv("DATABASE_URL") != "" {
+		cfg, err = config.LoadEnvConfig()
+	} else {
+		cfg, err = config.Load(*configPath)
+	}
 	if err != nil {
 		lo.Fatal("Failed to load config", "error", err)
 	}
