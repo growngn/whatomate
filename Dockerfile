@@ -26,6 +26,12 @@ RUN go build -o /bin/whatomate ./cmd/whatomate
 # Runtime stage
 FROM debian:bullseye-slim
 
+# Install CA certificates
+RUN apt-get update && \
+    apt-get install -y ca-certificates && \
+    update-ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy binary from builder
 COPY --from=builder /bin/whatomate /bin/whatomate
 
